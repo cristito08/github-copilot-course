@@ -5,6 +5,8 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
+from copy import deepcopy
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,63 +22,76 @@ current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
 
-# In-memory activity database
-activities = {
-    "Chess Club": {
-        "description": "Learn strategies and compete in chess tournaments",
-        "schedule": "Fridays, 3:30 PM - 5:00 PM",
-        "max_participants": 12,
-        "participants": ["michael@mergington.edu", "daniel@mergington.edu"]
-    },
-    "Programming Class": {
-        "description": "Learn programming fundamentals and build software projects",
-        "schedule": "Tuesdays and Thursdays, 3:30 PM - 4:30 PM",
-        "max_participants": 20,
-        "participants": ["emma@mergington.edu", "sophia@mergington.edu"]
-    },
-    "Gym Class": {
-        "description": "Physical education and sports activities",
-        "schedule": "Mondays, Wednesdays, Fridays, 2:00 PM - 3:00 PM",
-        "max_participants": 30,
-        "participants": ["john@mergington.edu", "olivia@mergington.edu"]
-    },
-    "Basketball Team": {
-        "description": "Competitive basketball team and training",
-        "schedule": "Mondays and Wednesdays, 4:00 PM - 5:30 PM",
-        "max_participants": 15,
-        "participants": ["james@mergington.edu", "alex@mergington.edu"]
-    },
-    "Tennis Club": {
-        "description": "Tennis training and friendly matches",
-        "schedule": "Tuesdays and Thursdays, 3:30 PM - 5:00 PM",
-        "max_participants": 16,
-        "participants": ["jessica@mergington.edu"]
-    },
-    "Art Studio": {
-        "description": "Painting, drawing, and visual arts",
-        "schedule": "Wednesdays, 3:30 PM - 5:00 PM",
-        "max_participants": 18,
-        "participants": ["isabella@mergington.edu", "lucas@mergington.edu"]
-    },
-    "Music Band": {
-        "description": "Learn instruments and perform in concerts",
-        "schedule": "Thursdays, 4:00 PM - 5:30 PM",
-        "max_participants": 25,
-        "participants": ["noah@mergington.edu", "ava@mergington.edu"]
-    },
-    "Science Club": {
-        "description": "Explore experiments and scientific research",
-        "schedule": "Fridays, 3:30 PM - 4:30 PM",
-        "max_participants": 20,
-        "participants": ["ethan@mergington.edu"]
-    },
-    "Debate Team": {
-        "description": "Competitive debate and public speaking",
-        "schedule": "Mondays, 3:30 PM - 5:00 PM",
-        "max_participants": 14,
-        "participants": ["mia@mergington.edu", "benjamin@mergington.edu"]
+def create_activities_data():
+    return {
+        "Chess Club": {
+            "description": "Learn strategies and compete in chess tournaments",
+            "schedule": "Fridays, 3:30 PM - 5:00 PM",
+            "max_participants": 12,
+            "participants": ["michael@mergington.edu", "daniel@mergington.edu"]
+        },
+        "Programming Class": {
+            "description": "Learn programming fundamentals and build software projects",
+            "schedule": "Tuesdays and Thursdays, 3:30 PM - 4:30 PM",
+            "max_participants": 20,
+            "participants": ["emma@mergington.edu", "sophia@mergington.edu"]
+        },
+        "Gym Class": {
+            "description": "Physical education and sports activities",
+            "schedule": "Mondays, Wednesdays, Fridays, 2:00 PM - 3:00 PM",
+            "max_participants": 30,
+            "participants": ["john@mergington.edu", "olivia@mergington.edu"]
+        },
+        "Basketball Team": {
+            "description": "Competitive basketball team and training",
+            "schedule": "Mondays and Wednesdays, 4:00 PM - 5:30 PM",
+            "max_participants": 15,
+            "participants": ["james@mergington.edu", "alex@mergington.edu"]
+        },
+        "Tennis Club": {
+            "description": "Tennis training and friendly matches",
+            "schedule": "Tuesdays and Thursdays, 3:30 PM - 5:00 PM",
+            "max_participants": 16,
+            "participants": ["jessica@mergington.edu"]
+        },
+        "Art Studio": {
+            "description": "Painting, drawing, and visual arts",
+            "schedule": "Wednesdays, 3:30 PM - 5:00 PM",
+            "max_participants": 18,
+            "participants": ["isabella@mergington.edu", "lucas@mergington.edu"]
+        },
+        "Music Band": {
+            "description": "Learn instruments and perform in concerts",
+            "schedule": "Thursdays, 4:00 PM - 5:30 PM",
+            "max_participants": 25,
+            "participants": ["noah@mergington.edu", "ava@mergington.edu"]
+        },
+        "Science Club": {
+            "description": "Explore experiments and scientific research",
+            "schedule": "Fridays, 3:30 PM - 4:30 PM",
+            "max_participants": 20,
+            "participants": ["ethan@mergington.edu"]
+        },
+        "Debate Team": {
+            "description": "Competitive debate and public speaking",
+            "schedule": "Mondays, 3:30 PM - 5:00 PM",
+            "max_participants": 14,
+            "participants": ["mia@mergington.edu", "benjamin@mergington.edu"]
+        }
     }
-}
+
+
+def reset_activities_data():
+    app.state.activities = deepcopy(create_activities_data())
+
+
+def get_activities_store():
+    if not hasattr(app.state, "activities"):
+        reset_activities_data()
+    return app.state.activities
+
+
+reset_activities_data()
 
 
 @app.get("/")
@@ -87,7 +102,7 @@ def root():
 @app.get("/activities")
 def get_activities():
     return JSONResponse(
-        content=activities,
+        content=get_activities_store(),
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
             "Pragma": "no-cache",
@@ -99,6 +114,8 @@ def get_activities():
 @app.post("/activities/{activity_name}/signup")
 def signup_for_activity(activity_name: str, email: str):
     """Sign up a student for an activity"""
+    activities = get_activities_store()
+
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -118,6 +135,8 @@ def signup_for_activity(activity_name: str, email: str):
 @app.delete("/activities/{activity_name}/signup")
 def unregister_from_activity(activity_name: str, email: str):
     """Remove a student from an activity"""
+    activities = get_activities_store()
+
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
 
